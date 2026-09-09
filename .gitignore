@@ -1,0 +1,16 @@
+# Datasets, experiment artifacts, and checkpoints.
+datasets/
+results/
+checkpoints/
+
+# Local Python environments and interpreter artifacts.
+.conda/
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Editor and operating-system temporary files.
+.vscode/*.log
+.DS_Store
