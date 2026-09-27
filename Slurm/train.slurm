@@ -12,8 +12,16 @@ set -euo pipefail
 
 PROJECT_DIR="${PROJECT_DIR:-$SLURM_SUBMIT_DIR}"
 CONDA_ENV="${CONDA_ENV:-dehaze}"
-OUTPUT_DIR="${OUTPUT_DIR:-$PROJECT_DIR/results/ckpt/cut_baseline}"
-TRAIN_LOG="${TRAIN_LOG:-$OUTPUT_DIR/train.log}"
+EXPERIMENT_NAME="${1:-${EXPERIMENT_NAME:-cut_baseline}}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-$PROJECT_DIR/results/ckpt}"
+OUTPUT_DIR="${OUTPUT_DIR:-$OUTPUT_ROOT/$EXPERIMENT_NAME}"
+CONSOLE_LOG="${CONSOLE_LOG:-$OUTPUT_DIR/console.log}"
+
+if [[ ! "$EXPERIMENT_NAME" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "Invalid experiment name: $EXPERIMENT_NAME" >&2
+  echo "Use only letters, numbers, dots, underscores, and hyphens." >&2
+  exit 2
+fi
 
 mkdir -p "$OUTPUT_DIR"
 
@@ -39,6 +47,8 @@ cd "$PROJECT_DIR"
   echo "started_at=$(date --iso-8601=seconds)"
   echo "project_dir=$PROJECT_DIR"
   echo "conda_env=$CONDA_ENV"
+  echo "experiment_name=$EXPERIMENT_NAME"
+  echo "output_dir=$OUTPUT_DIR"
   echo "cuda_visible_devices=${CUDA_VISIBLE_DEVICES:-unset}"
   conda run --no-capture-output -n "$CONDA_ENV" python train.py \
     --data-root "${DATA_ROOT:-$PROJECT_DIR/datasets/RRSHID}" \
@@ -46,4 +56,4 @@ cd "$PROJECT_DIR"
     --device cuda \
     --num-workers "${NUM_WORKERS:-8}" \
     "${EXTRA_ARGS[@]}"
-} > "$TRAIN_LOG" 2>&1
+} > "$CONSOLE_LOG" 2>&1

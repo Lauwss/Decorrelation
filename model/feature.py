@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .backbone import initialize_weights
+
 
 class PatchSampleF(nn.Module):
     """Patch sampler and optional Expander projection network used by CUT."""
@@ -25,15 +27,18 @@ class PatchSampleF(nn.Module):
             ).to(feature.device))
         self._expander_initialized = True
 
-    def initialize(self, features):
+    def initialize(self, features, init_type='xavier', init_gain=0.02):
         if self.use_expander and not self._expander_initialized:
             self._create_expanders(features)
+            initialize_weights(self, init_type, init_gain)
 
-    def forward(self, features, num_patches=256, patch_ids=None):
+    def forward(self, features, num_patches=256, patch_ids=None,
+                return_projected=False):
         if self.use_expander and not self._expander_initialized:
             self._create_expanders(features)
         sampled_features = []
         sampled_ids = []
+        projected_features = []
         for index, feature in enumerate(features):
             batch_size, _, height, width = feature.shape
             flattened = feature.permute(0, 2, 3, 1).reshape(
@@ -50,6 +55,10 @@ class PatchSampleF(nn.Module):
                 sampled = flattened.reshape(-1, flattened.shape[-1])
             if self.use_expander:
                 sampled = self.expanders[index](sampled)
+            if return_projected:
+                projected_features.append(sampled)
             sampled_features.append(F.normalize(sampled, dim=1))
             sampled_ids.append(ids)
+        if return_projected:
+            return sampled_features, sampled_ids, projected_features
         return sampled_features, sampled_ids

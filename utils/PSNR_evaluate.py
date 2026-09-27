@@ -31,8 +31,11 @@ def _pad_to_multiple(image, multiple=4):
 
 
 @torch.no_grad()
-def evaluate_paired_psnr(generator, source_dir, target_dir, device, max_images=0):
+def evaluate_paired_psnr(generator, source_dir, target_dir, device, max_images=0,
+						 batch_size=1):
 	"""Evaluate a generator against same-named images in source and target folders."""
+	if batch_size < 1:
+		raise ValueError('batch_size must be positive')
 	source_paths = {path.name: path for path in Path(source_dir).glob('*.png')}
 	target_paths = {path.name: path for path in Path(target_dir).glob('*.png')}
 	paired_names = sorted(source_paths.keys() & target_paths.keys())
@@ -45,19 +48,43 @@ def evaluate_paired_psnr(generator, source_dir, target_dir, device, max_images=0
 
 	was_training = generator.training
 	generator.eval()
-	scores = []
+	score_sum = 0.0
+	score_count = 0
+	sources = []
+	targets = []
+
+	def evaluate_batch():
+		nonlocal score_sum, score_count
+		if not sources:
+			return
+		source_batch = torch.stack(sources).to(device)
+		target_batch = torch.stack(targets).to(device)
+		height, width = target_batch.shape[-2:]
+		output = generator(source_batch)[:, :, :height, :width]
+		batch_count = source_batch.shape[0]
+		score_sum += calculate_psnr(output, target_batch) * batch_count
+		score_count += batch_count
+		sources.clear()
+		targets.clear()
+
 	for name in paired_names:
 		try:
-			source = _load_image(source_paths[name]).unsqueeze(0).to(device)
-			target = _load_image(target_paths[name]).unsqueeze(0).to(device)
+			source = _load_image(source_paths[name])
+			target = _load_image(target_paths[name])
 		except (OSError, ValueError):
 			continue
-		source, height, width = _pad_to_multiple(source)
-		output = generator(source)[:, :, :height, :width]
-		if output.shape != target.shape:
+		if source.shape != target.shape:
 			continue
-		scores.append(calculate_psnr(output, target))
+		if targets and target.shape != targets[0].shape:
+			evaluate_batch()
+		source, _, _ = _pad_to_multiple(source.unsqueeze(0))
+		source = source.squeeze(0)
+		sources.append(source)
+		targets.append(target)
+		if len(sources) == batch_size:
+			evaluate_batch()
+	evaluate_batch()
 	generator.train(was_training)
-	if not scores:
+	if not score_count:
 		raise RuntimeError('No valid same-sized image pairs were available for PSNR')
-	return sum(scores) / len(scores)
+	return score_sum / score_count
