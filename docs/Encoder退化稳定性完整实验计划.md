@@ -215,4 +215,4 @@ results/feature_analysis/encoder_robustness/
 - 不用 Expander NCE 距离替代 raw Encoder 指标；
 - 不用最终 epoch 替代验证集最佳 checkpoint；
 - 不因某个 seed 或某一层结果好看而挑选报告范围；
-- 不把相关性下降、距离下降直接写成已完成 disentanglement。
+- 不把相关性下降、距离下降直接写成已完成的跨域不变性；必须结合域探针、同域参照和跨退化迁移进行验证。

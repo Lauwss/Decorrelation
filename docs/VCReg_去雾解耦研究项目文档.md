@@ -2,7 +2,7 @@
 
 > 版本：v1.2 ｜ 日期：2026-09-26
 > 状态：阶段性研究文档（已完成 NCE 主诊断、VCReg 长程原型和 raw Encoder 辅助分析；严格机制闭环仍在进行）
-> 关键词：Unpaired Image Dehazing, CUT, PatchNCE, VICReg/VCReg, Decorrelation, Minimal-Guidance Disentanglement, Domain Transfer, Representation Learning
+> 关键词：Unpaired Image Dehazing, CUT, PatchNCE, VICReg/VCReg, Decorrelation, Domain-Invariant Representation Learning, Domain Transfer
 
 ---
 
@@ -12,17 +12,15 @@
 
 **在 unpaired domain transfer（CUT 范式）的 fine-tuning 阶段，将 variance-covariance regularization（VCReg）施加到 PatchNCE 使用的 Expander feature 上，抑制域特异的相关冗余，缩小跨域逐样本几何缺口，进而学习更接近跨域不变的表征。**
 
-当前研究不把“通道去相关”直接等同于完整 disentanglement。项目的可证伪目标是：在不破坏内容保持和生成质量的前提下，减少生成结果在 NCE 空间中对输入域的过度依赖，使 $G(A)$ 更接近配对清晰域 $B$，并在后续跨退化迁移实验中体现出更好的表征稳定性。
+项目的可证伪目标是：在不破坏内容保持和生成质量的前提下，减少生成结果在 NCE 空间中对输入域的过度依赖，使 $G(A)$ 更接近配对清晰域 $B$，并验证 VCReg 是否能够学习更稳定的跨域表征。
 
 ### 1.2 核心判断（立项依据）
 
 1. **已确认的主现象**：在训练实际使用的 PatchNCE/Expander 空间中，CUT 的 $d(A,G(A))$ 明显小于 $d(B,G(A))$，说明生成结果容易停留在输入域表征附近，存在可测量的跨域逐样本对齐缺口。
-2. **VCReg 的当前证据**：VCReg 长程原型降低 Expander 通道相关性，并在完整配对测试集上降低 $d(B,G(A))$ 和 source preference；这支持“去相关正则有助于减弱源域锚定”的判断，但尚不足以证明完成了通用的 degradation/content disentanglement。
+2. **VCReg 的当前证据**：VCReg 长程原型降低 Expander 通道相关性，并在完整配对测试集上降低 $d(B,G(A))$ 和 source preference；这支持“去相关正则有助于减弱源域锚定、改善跨域表征”的判断。
 3. **辅助证据**：raw Encoder 也观察到同方向的域关系变化，说明部分变化可能在进入 Expander 前已经发生；但模型优劣和主要结论仍以 NCE/Expander 空间为准，因为 PatchNCE 与 VCReg 的训练约束作用于该空间。
-3. **文献空白**：VCReg 类方法目前**只用于 pretraining 语境**（SSL / supervised pretraining），从未在 domain transfer / restoration 的 fine-tuning 阶段使用，更从未被当作解耦工具。
-4. **动机同构**：VCReg 论文防 shortcut 的初衷 ≈ disentanglement 的初衷；但 VCReg 给出的是**几何/能量意义上的独立性**（协方差结构），与 VAE 系**概率意义上的独立性**（对角后验）是不同的解耦语义，且 VCReg 可直接挂在 CUT encoder 上，无需重构分支与重参数化。
-5. **场景独有的弱引导**：大气散射模型只有 (β, A) 两个物理参数，清晰图 + 随机参数可批量合成 hazy 图，天然构造"只差退化因子"的样本对——这正满足 weakly-supervised disentanglement 的 pairs 设定，且**无需任何人工标注**。
-6. **定位决策**：叙事重心放在 restoration / 低层视觉社区，representation quality 作为差异化证据出现（跨退化迁移 + 雾天下游任务），不正面进军 SSL 赛道、不在 ImageNet 刷榜。
+3. **文献空白**：VCReg 类方法主要用于 pretraining 语境（SSL / supervised pretraining），在 domain transfer / restoration 的 fine-tuning 阶段仍缺少系统研究。
+4. **定位决策**：叙事重心放在 restoration / 低层视觉社区，核心贡献是用 VCReg 改善非配对迁移中的跨域表征几何和不变性，不正面进军 SSL 赛道，也不把通道去相关直接包装成更强的语义结论。
 
 ### 1.3 方法学设定优势（v1.1 新增）
 
@@ -32,7 +30,7 @@
 
 - 不提出"新 encoder 架构"（贡献是训练范式/正则方案，措辞用 framework / paradigm / regularization scheme）。
 - 不做纯理论文章（理论分析作为论文的 analysis section）。
-- 不做"disentanglement-based pretraining 新范式"的正面对决（这是 Paper 2 的候选，由实验结果投票决定）。
+- 不把本项目包装成新的通用预训练范式，重点验证 restoration domain transfer 中的表征几何改善。
 - 不与 ODCR（CVPR 2025, orthogonal decoupling contrastive regularization for unpaired dehazing）撞车——需在 related work 中明确区分（见 §4.6）。
 
 ### 1.5 当前研究问题
@@ -101,7 +99,7 @@ $$
 
 ### 2.5 VCReg 如何可能改善跨域不变表征
 
-当前最稳妥的机制解释是一个“几何缺口收窄”路径，而不是直接宣称显式解耦：
+当前最稳妥的机制解释是一个“几何缺口收窄”路径：
 
 1. **PatchNCE 提供内容保持，但锚点偏向 A 域。** 它鼓励 $G(A)$ 在同位置保持与 $A$ 相似的局部结构，因此天然容易保留雾域特征。
 2. **GAN 只约束目标域边际分布。** 它要求生成集合看起来像 B 域，但不要求每个 $G(A)$ 与对应的 $B$ 在表征空间逐样本对齐。
@@ -109,7 +107,7 @@ $$
 4. **VCReg 的 covariance 项压缩冗余相关方向，variance 项防止整体收缩。** 在 PatchNCE 仍负责局部内容保持的前提下，VCReg 可能减少依赖单一域特异方向的自由度，使生成结果从 A 域流形内部的“最小移动”转向更接近 B 域的表示区域。
 5. **结果表现为 source preference 下降。** 这意味着生成结果与 B 的距离相对下降，或与 A 的距离相对上升，最终缩小 $\Delta_{source}$；这是目前对“更好的跨域不变性”的操作性定义。
 
-这里的“不变性”是功能性的、相对于域变化的几何稳定性，不等于数学意义上的完全域不变，也不等于已经分离出可独立交换的 content/degradation latent。
+这里的“不变性”指相对于域变化的可测量几何稳定性。当前仍需通过严格消融、同域参照、域探针和跨退化测试验证其范围，不能把单一距离下降直接解释为完整域不变。
 
 ### 2.6 当前工作进展
 
@@ -125,10 +123,10 @@ $$
 | 训练过程 $\Delta$ 曲线 | 未完成 | 当前只有 checkpoint 结束后的静态测量 |
 | 雾浓度与 $\Delta$ 关系 | 未完成 | 尚无按 $\beta$/能见度分桶的主实验 |
 | 同域参照、检索和域探针 | 未完成 | 尚不能完全排除内容差异或量化域可分性变化 |
-| 显式 latent swap、DCI/MIG | 未完成 | 尚不能宣称完整 disentanglement |
+| 域探针、检索和跨退化稳定性 | 未完成 | 尚不能判断表征不变性是否可泛化 |
 | 跨退化迁移 | 未完成 | 尚不能宣称通用 degradation-invariant transfer |
 
-因此，项目已经从“VCReg 是否有效”的原型阶段进入“VCReg 为什么有效、改善是否可泛化”的验证阶段。
+因此，项目已经从“VCReg 是否有效”的原型阶段进入“VCReg 为什么能改善跨域不变表征、改善是否可泛化”的验证阶段。
 
 ---
 
@@ -160,7 +158,7 @@ $$
 ### 4.1 VICReg / VCReg 谱系
 
 - VICReg（Bardes et al., ICLR 2022）：variance hinge + invariance + covariance penalty 三件套；covariance penalty 与 Barlow Twins 的 cross-correlation 目标有内在联系。
-- Mialon et al. (2022)：VCReg 通过随机 MLP projector 反向传播，在 encoder 输出上强制 pairwise independence；covariance 惩罚等价于最小化各维度间 HSIC 之和——**支撑 decorrelation → 某种解耦的假设**。
+- Mialon et al. (2022)：VCReg 通过随机 MLP projector 反向传播，在 encoder 输出上减少通道间相关性；covariance 惩罚可用 HSIC 视角理解，为分析 VCReg 如何抑制冗余域特征提供理论背景。
 - Shwartz-Ziv et al. (2023, 信息论分析)：variance/covariance 项 ≈ 最大化表征熵的 proxy；invariance 项 ≈ 最小化条件熵；**仅 covariance 惩罚会导致坍缩，必须与 invariance/variance 平衡**——支撑 H2。
 - Zhu et al. (ICML 2024, "Variance-Covariance Regularization")：VCReg 用于中间层，显式讨论 gradient starvation 与 neural collapse，CDNV 度量；在 long-tail、hierarchical classification 的预训练与迁移上 SOTA。
 - 2025 年延伸工作（kernel VICReg、spectral VICReg、SAG-VICReg 等）：全部停留在 SSL/预训练语境——**确认文献空白**。
@@ -169,14 +167,13 @@ $$
 
 - CUT（ICCV 2020）：PatchNCE。
 - FastCUT / Cut&Tag：效率与 shortcut 缓解。
-- 去雾领域的 CUT 变体（多篇）；**ODCR（CVPR 2025）用词与我们的方向高度重合（orthogonal + decoupling + contrastive + unpaired dehazing），必须精读并明确区分**：其大概率为 feature-level orthogonal contrastive loss，而非协方差结构正则 + 弱引导解耦。
+- 去雾领域的 CUT 变体（多篇）；ODCR（CVPR 2025）需要精读并明确区分：本项目主打 NCE 空间跨域缺口诊断与 covariance-structure regularization，而不是 orthogonal contrastive loss。
 
-### 4.3 Disentanglement 理论
+### 4.3 跨域不变表征学习
 
-- Locatello et al. (ICML 2019)：无监督解耦不可辨识；随机种子与超参影响大于模型选择——**因此我们的分解假设必须是功能性的（z = μ_dom + Wc + W_dδ），而非结构性的（不做显式 z_c/z_d 切块）**。
-- Shu et al. (ICLR 2020)：弱监督解耦 guarantee 框架（restricted labeling / match pairing / rank pairing）。
-- Locatello et al. (2020, "Weakly-Supervised Disentanglement Without Compromises", Ada-GVAE)：成对观测（只差少数 factor）即可可靠解耦，无需标注哪个 factor 变了。
-- AAAI 2020 pairwise similarity：样本对相似度标签显著改善解耦。
+- 域不变表征学习通常通过对比学习、统计约束、域对抗或跨域匹配减少域特异信息；本项目关注其中的二阶统计约束路径。
+- VICReg/VCReg 提供 variance 与 covariance 正则化，用于避免表示坍缩并减少通道冗余。本项目将其从预训练语境迁移到 CUT 的 restoration fine-tuning，并用 NCE 空间中的跨域距离直接评估效果。
+- 本项目不预设显式的 content/degradation 子空间，也不使用解耦指标作为核心目标；是否形成更好的域不变表征由 $\Delta$、域探针、同域参照和跨退化迁移共同判断。
 
 ### 4.4 与 JEPA 的关系（仅作叙事参照，不对标）
 
@@ -188,18 +185,15 @@ JEPA 在表征空间做预测、避免像素级重构。我们的方法同为 em
 
 ### 5.1 总体框架：VCReg-augmented CUT + Physics-Guided Weak Supervision
 
-在 CUT 的 encoder E（即生成器 G 的 encoder）的瓶颈特征 z = E(x) 上，施加 VCReg 两项（λ_v, λ_c 可调），并可选引入物理引导的解耦监督。
+在 CUT 的 encoder E（即生成器 G 的 encoder）的 PatchNCE 特征投影上，施加 VCReg 两项（λ_v, λ_c 可调），研究其对跨域表征几何的影响。
 
 **损失函数**：
 
-    L_total = L_GAN + λ_NCE · L_PatchNCE + λ_v · L_variance + λ_c · L_covariance + λ_g · L_guide
+    L_total = L_GAN + λ_NCE · L_PatchNCE + λ_v · L_variance + λ_c · L_covariance
 
 - **L_variance**：hinge 形式，max(0, 1 − sqrt(Var(z_i)))，对逐通道方差施加下界。
 - **L_covariance**：off-diagonal covariance 的平方和 C_ij²（i ≠ j）。
-- **L_guide（弱引导，可选/可调权重，v1.1 注意：§2.3 发现后此项优先级下调——见 §5.3）**：利用散射模型合成对 (x_c, x_h = S(x_c; β, A))。两种候选形式：
-  - (a) *Factor-consistency*：E(x_h) 与 E(x_c) 在 content 子空间内对齐（借鉴 Ada-GVAE 的 pairs 思想）；
-  - (b) *Degradation-swap / contrastive*：同 content 不同 (β, A) 的 hazy 样本，其表征差应落于由退化参数张成的子空间。
-  - 注意：引导只用**合成数据**，真实 unpaired 数据仍走 CUT 主损失——合成数据不破坏 unpaired 设定。
+- 当前不引入额外的物理引导损失。散射模型和配对关系只用于构造诊断数据、控制退化强度和评估跨域表征稳定性，不改变严格非配对训练设定。
 
 ### 5.2 实现细节（待定项）
 
@@ -209,13 +203,13 @@ JEPA 在表征空间做预测、避免像素级重构。我们的方法同为 em
 - λ 初值：λ_v = λ_c = 1（VICReg 惯例），λ_g 从小往大扫。
 - **测量协议（v1.1 新增）**：d 统一在瓶颈层、eval 模式下测量，同时报告中间层版本；确认无 stop-gradient 等干扰。
 
-### 5.3 研究路线优先级调整（v1.1）
+### 5.3 研究路线优先级调整（v1.2）
 
 §2.3 的"假对齐"发现改变了任务分解：
 
-1. **第一优先：Δ 缺口的机制与消除**——VCReg 不加 L_guide 时能收窄 Δ 多少？这是零额外监督（保持纯 unpaired）即可讲的核心故事。
-2. **第二优先：解耦与弱引导**——L_guide 作为增量贡献，回答"最少需要多少引导"。
-3. 若 VCReg 单独已显著收窄 Δ 且解耦证据充分，论文甚至可以纯 unpaired + 物理先验（散射模型仅用于分析与合成评估数据），故事更干净。
+1. **第一优先：$$ 缺口的机制与消除**——在不增加配对训练监督的情况下，验证 VCReg 能否稳定收窄源域锚定。
+2. **第二优先：域不变性防御性评估**——加入同域参照、域探针、检索、谱结构和训练过程曲线，排除“整体收缩”或“距离指标偶然变化”等解释。
+3. **第三优先：跨退化泛化**——在机制指标稳定后，验证冻结或轻量微调的 Encoder 是否能迁移到去雨、去模糊等相关复原任务。
 
 ---
 
@@ -253,16 +247,17 @@ JEPA 在表征空间做预测、避免像素级重构。我们的方法同为 em
 | 编号 | 实验 | 验证内容 |
 |---|---|---|
 | A1 | var-only / cov-only / var+cov | H2 / P1：三要素分工 |
-| A2 | λ_v, λ_c, λ_g 敏感性 | 稳定性与最佳配比 |
+| A2 | λ_v, λ_c 敏感性 | 稳定性与最佳配比 |
 | A3 | VCReg 施加层（瓶颈 vs 中间层） | ICML 2024 结论是否迁移到我们的 setting |
-| A4 | 无 L_guide vs 两种 L_guide | 最小引导究竟多小够用 |
+| A4 | VCReg 施加层与分支 | 位置和统计对象对跨域几何的影响 |
 | A5（新） | Δ、域探针准确率、有效秩随 λ_c 变化 | H1/P3/P4 的机制指标 |
 
-### 7.3 解耦验证实验（对应 RQ2）
+### 7.3 跨域不变性验证实验（对应 RQ2）
 
-- **退化可控性**：固定 content，调节 z 中退化方向分量，生成不同浓度/大气光的雾图（可视化 + 与真实散射参数的相关性定量分析）。
-- **退化交换**：同 content 不同 (β, A) 样本间交换退化分量，观察 content 保持、雾型变化。
-- **解耦度量**：引导充分时报告 DCI / MIG（合成数据 ground-truth factor 已知）。
+- **域可分性**：冻结 Encoder/Expander，训练线性 A/B 域探针，报告 A、B 和 $G(A)$ 的域分类结果。
+- **同域参照**：报告 $d(A,A')$、$d(B,B')$，确认 $d(B,G(A))$ 的变化不是内容差异或特征尺度变化造成的。
+- **逐样本检索**：报告 paired retrieval 的 top-1/top-k，检验 NCE 距离缺口是否对应更可靠的跨域对应关系。
+- **跨退化稳定性**：按可控雾浓度或能见度分桶分析 $$；在机制稳定后，评估 Encoder 到去雨、去模糊等复原任务的迁移能力。
 
 ### 7.4 表征迁移实验（对应 RQ3，Paper 1 的"超额证据"）
 
@@ -293,10 +288,9 @@ JEPA 在表征空间做预测、避免像素级重构。我们的方法同为 em
 1. **发现与诊断**：揭示 CUT 在无配对去雾中的"假对齐"现象——域内对齐良好（d(A, G(A)) 小）但跨域逐样本对齐存在巨大缺口（d(B, G(A)) 大），并给出其目标函数层面的解释（跨域对齐不在 PatchNCE/GAN 任一损失的优化视野内）；提出 Δ = d(B, G(A)) − d(A, G(A)) 作为跨域对齐缺口的诊断指标。
 2. **首次将 VCReg 引入 domain transfer / restoration 的 fine-tuning 阶段**（跳出 pretraining 语境），显著收窄 Δ，并系统验证其对表征结构的改善（域可分性、有效秩、CDNV）。
 3. **机制分析**：提出"退化诱导的高相关主导方向被 covariance 项针对性压缩"的解释（H1），给出线性模型下围绕 Δ 的余弦距离界（§6.1），并以 toy 实验 + 浓度依赖曲线（P2）+ 谱分析（P4）佐证。
-4. **物理引导的最小监督解耦（增量贡献）**：散射模型免费构造 pairs，实现 degradation/content 功能性解耦与退化可控生成（几何解耦路径，与 VAE 系概率解耦形成对照）。
-5. **跨退化迁移证据**：解耦 encoder 的 degradation-invariance 与迁移能力。
+4. **跨域不变性验证**：通过同域参照、域探针、检索、谱分析和跨退化迁移，评估 VCReg 改善是否超出单一距离指标。
 
-**Related work 必须处理**：ODCR（明确区分：orthogonal contrastive loss ≠ covariance-structure 正则 + 弱引导解耦）；VCReg/ICML 2024（我们用的是其方法、但场景与目的不同）；Ada-GVAE / Shu et al.（我们借其 pairs 思想，但非 VAE、非通用解耦 benchmark）。
+**Related work 必须处理**：ODCR（明确区分 orthogonal contrastive loss 与 covariance-structure regularization）；VCReg/ICML 2024（使用相同统计正则，但场景从预训练扩展到 restoration domain transfer）；CUT/FastCUT/Cut&Tag（说明 PatchNCE 的源域锚定问题）。
 
 ---
 
@@ -307,7 +301,7 @@ JEPA 在表征空间做预测、避免像素级重构。我们的方法同为 em
 | M0 准备 | 第 1–2 周 | 精读 ODCR 并写差异分析；复现 CUT 去雾 baseline；VCReg 接入代码跑通；**钉死 d 的测量协议（层、eval 模式、无梯度干扰）** |
 | M1 关键决策实验 | 第 3–4 周 | A1 消融初版 + **Δ 曲线与防御性标定**（§7.5）+ **跨退化迁移原型实验**（§7.4）→ 决定叙事收敛点 |
 | M2 主实验 | 第 2–3 月 | 主表全部对比、全部消融（含 A5 机制指标）、Δ–浓度曲线 |
-| M3 解耦实验 | 第 3–4 月 | §7.3 全部 + L_guide 形式定型（视 M1 结果决定优先级） |
+| M3 跨域泛化实验 | 第 3–4 月 | §7.3 全部，完成域探针、检索和跨退化迁移原型 |
 | M4 理论 + 写作 | 第 4–5 月 | Δ 的线性模型命题与 toy 验证；论文初稿 |
 | M5 投稿准备 | 第 6 月 | 内审、补充实验、投稿（目标：CVPR/ICCV/ECCV 或 TPAMI 视结果定） |
 
@@ -317,10 +311,10 @@ JEPA 在表征空间做预测、避免像素级重构。我们的方法同为 em
 
 | 风险 | 概率 | 影响 | 备选方案 |
 |---|---|---|---|
-| ODCR 与我们方向重叠度高 | 中 | 贡献 4 被稀释 | 精读后切割：主打 Δ 缺口诊断 + covariance 结构正则；解耦降为增量贡献 |
+| ODCR 与我们方向重叠度高 | 中 | 贡献边界被稀释 | 精读后明确区分：主打 Δ 缺口诊断、covariance 结构正则和 restoration transfer |
 | 跨退化迁移提升微弱 | 中 | Paper 2 取消，贡献 5 缩水 | 叙事收敛为"假对齐诊断 + 缺口收窄 + 机制分析"，删去范式类表述 |
 | covariance 估计对 batch size 敏感 | 高 | 训练不稳定 | running covariance / 大 batch / Barlow Twins 式折中 |
-| L_guide 引入合成域 bias | 中 | 真实雾域性能下降 | 降低 λ_g；仅对合成 pairs 计算 L_guide；或完全去掉 L_guide（§5.3 路线 1：纯 unpaired + 物理先验） |
+| 距离下降来自整体收缩 | 中 | 域不变性结论被高估 | 同时报告 d(A)、d(B)、norm、variance、effective rank 和同域参照 |
 | 线性模型理论与深度模型行为不符 | 中 | analysis section 被质疑 | 明确标注适用范围；非线性 toy + 实证相关性曲线补强 |
 | 纯去雾性能提升不显著 | 低 | 论文卖点转向表征与诊断 | 主指标增加 LPIPS/FID 与 Δ/域探针等结构指标；强调机制贡献 |
 | Δ 改善主要来自 d(A) 也下降（"一起靠拢"而非跨域改善） | 中（v1.1 新增） | H1 被误读 | 同时报告 d(A)、d(B)、Δ 三者；要求 Δ 收窄主要由 d(B) 下降驱动才算机制成立 |
@@ -331,7 +325,7 @@ JEPA 在表征空间做预测、避免像素级重构。我们的方法同为 em
 
 仅当 §7.4 迁移实验结果显著时启动：
 
-**选题方向**：Degradation-Invariant Pretraining——将验证过的解耦机制规模化到多退化类型，提出跨退化预训练范式；评价协议升级为下游任务与跨数据集泛化；此时才正面进入"更好的 representation 提取器"叙事（JEPA 量级工作）。若结果一般，则止步于 Paper 1，损失可控。
+**选题方向**：Domain-Invariant Representation Learning for Unpaired Restoration——将验证过的 VCReg 训练方案扩展到多退化类型，并以跨任务迁移、域可分性和跨数据集泛化评价表征质量。若迁移结果一般，则收敛为“跨域几何诊断 + VCReg 正则化”工作。
 
 ---
 
@@ -353,20 +347,16 @@ JEPA 在表征空间做预测、避免像素级重构。我们的方法同为 em
 3. Shwartz-Ziv et al., Information-theoretic analysis of VICReg, 2023.
 4. Zhu et al., Variance-Covariance Regularization (intermediate layers, gradient starvation, neural collapse), ICML 2024.
 5. Park et al., CUT, ICCV 2020.
-6. Locatello et al., Challenging Common Assumptions in Disentanglement, ICML 2019.
-7. Shu et al., Weakly Supervised Disentanglement Guarantees, ICLR 2020.
-8. Locatello et al., Weakly-Supervised Disentanglement Without Compromises (Ada-GVAE), ICML 2020.
-9. Pairwise similarity supervision for disentanglement, AAAI 2020.
-10. ODCR, CVPR 2025.
-11. Cut&Tag / FastCUT（CUT 后续工作）.
-12. RESIDE (Li et al., TIP 2019) 等数据集论文.
+6. ODCR, CVPR 2025.
+7. Cut&Tag / FastCUT（CUT 后续工作）.
+8. RESIDE (Li et al., TIP 2019) 等数据集论文.
 
 ## 附录 C：v1.0 → v1.1 变更记录
 
 1. 新增 §1.3 方法学设定优势（unpaired training + paired diagnostics）。
 2. 新增 §2.3 关键诊断观察与"假对齐"现象（含数据表与形式化）。
 3. H1 细化为"退化主导方向假说"（高跨通道相关性被 covariance 项针对性压缩）；新增可证伪预测 P2（浓度依赖）、P3（域分层探针）、P4（谱结构）。
-4. §5.3 新增研究路线优先级调整（VCReg-单独收窄 Δ 为第一优先，L_guide 降为增量贡献）。
+4. §5.3 更新研究路线：VCReg 单独收窄 Δ 为第一优先，跨域不变性防御性评估和跨退化迁移为后续重点。
 5. §6.1 理论命题改为围绕 Δ 展开（域偏移投影 + 退化残差投影）。
 6. §7.2 消融表新增 A5（Δ/域探针/有效秩机制指标）；§7.5 大幅扩充为"防御性标定 + 机制验证"两小节（Δ 曲线、Δ–浓度曲线、域探针、PCA 谱分析）。
 7. §8 贡献列表更新："假对齐"诊断升为贡献 1，新增 Δ 指标；风险表新增"Δ 改善来源误判"风险。

@@ -59,7 +59,7 @@ NCE/Expander 是本项目的**主分析空间**，因为 PatchNCE 与 VCReg 的�
 
 1. 标准 CUT 的生成结果在 NCE 空间中存在明显源域偏好；
 2. VCReg 后 `d(B,G(A))` 和 `Delta_source` 下降，跨域逐样本几何缺口有所收窄；
-3. VCReg 后缺口仍然明显为正，因此当前证据支持“改善跨域对齐”，但不支持“已经实现完全域不变”或“已经完成显式 disentanglement”。
+3. VCReg 后缺口仍然明显为正，因此当前证据支持“改善跨域对齐”，但还不能宣称已经实现完全域不变；域不变性的范围仍需通过严格消融和跨退化测试确认。
 
 多种子长程实验还显示，Exp4 相比 Exp1 的平均结果为：
 
@@ -83,21 +83,20 @@ NCE/Expander 是本项目的**主分析空间**，因为 PatchNCE 与 VCReg 的�
 
 ## 当前限制与下一步
 
-当前不能宣称：
+当前仍需验证：
 
-- 已完成 content/degradation 的显式解耦；
-- VCReg 已经通过严格公平消融证明优于 CUT；
+- VCReg 是否在严格公平消融中稳定优于 CUT；
 - covariance 项单独负责压缩退化方向；
 - `Delta_source` 已经随雾浓度建立稳定关系；
 - 表征已经跨去雨、去模糊等退化迁移；
-- 已完成域探针、检索、latent swap、DCI/MIG 或理论 toy 验证。
+- 域探针、检索和协方差谱指标是否与 NCE 距离变化一致。
 
 下一阶段优先级：
 
 1. 完成 no-VCReg、covariance-only、variance-only、full 的严格多种子消融；
 2. 增加同域参照、paired retrieval、完整测试集置信区间和训练过程 `Delta` 曲线；
 3. 按雾浓度或能见度分析 `Delta_source`，并比较协方差谱、PC1 ratio 和 effective rank；
-4. 在机制证据稳定后，再评估显式解耦和跨退化迁移。
+4. 在机制证据稳定后，评估跨去雨、去模糊等任务的表征迁移和跨退化稳定性。
 
 ## 目录结构
 
@@ -152,8 +151,8 @@ python visualize_encoder_domain_alignment.py
 
 ## 文档索引
 
-- [VCReg 去雾解耦研究项目文档](docs/VCReg_去雾解耦研究项目文档.md)：研究问题、机制假说、实验设计和当前主线。
-- [VCReg 去雾解耦实验完成情况报告](docs/VCReg_去雾解耦实验完成情况报告.md)：已完成结果、证据边界和下一阶段实验清单。
+- [VCReg 跨域不变表征研究项目文档](docs/VCReg_去雾解耦研究项目文档.md)：研究问题、机制假说、实验设计和当前主线。
+- [VCReg 跨域不变表征实验完成情况报告](docs/VCReg_去雾解耦实验完成情况报告.md)：已完成结果、证据边界和下一阶段实验清单。
 - [Encoder 空间域对齐分析报告](docs/Encoder空间域对齐分析报告.md)：NCE 主分析与 raw Encoder 辅助证据。
 - [项目架构与工作总览](docs/项目架构与工作总览.md)：代码职责、梯度边界和复现注意事项。
 - [可视化报告](results/feature_analysis/encoder_domain_alignment/visual_report/report.md)：生成后可查看 NCE 和 raw Encoder 图表。
@@ -162,4 +161,4 @@ python visualize_encoder_domain_alignment.py
 
 当前项目最准确的定位是：**非配对图像迁移中的跨域表征几何诊断与 VCReg 去相关正则化。**
 
-研究目标是通过可测量的 NCE 空间指标，理解并逐步减弱非配对 CUT 的源域锚定，而不是预先假设任何去相关操作都能自动产生完整的语义解耦或通用不变表征。
+研究目标是通过可测量的 NCE 空间指标，理解并逐步减弱非配对 CUT 的源域锚定，验证 VCReg 是否能在保持内容和生成质量的同时学习更好的跨域不变表征。

@@ -15,7 +15,7 @@
 PatchNCE：继续使用 L2-normalized Expander 输出
 ```
 
-`fake-only`、first hidden 和 normalized output 保留为消融，不作为主方案。后续是否形成语义解耦，以及是否降低退化因素引起的输出方差，属于独立的机理分析阶段。
+`fake-only`、first hidden 和 normalized output 保留为消融，不作为主方案。后续重点是验证不同测量位置对跨域距离、域可分性和跨退化稳定性的影响。
 
 ## 2. 当前特征路径
 
@@ -405,7 +405,7 @@ $$
 
 ## 12. 当前阶段的评估
 
-当前阶段不把 generated-clear cosine distance 或退化敏感性解释为显式解耦证据。训练和离线分析至少报告：
+当前阶段不把 generated-clear cosine distance 或退化敏感性单独解释为域不变性证据。训练和离线分析至少报告：
 
 ```text
 paired PSNR
@@ -421,11 +421,11 @@ Expander effective rank
 Expander PC1 explained ratio
 ```
 
-图像质量指标用于判断去相关是否损害主任务；它们不是显式解耦的直接度量。
+图像质量指标用于判断去相关是否损害主任务；它们不是跨域不变性的直接度量。
 
 ## 13. 后续机理分析（不属于当前实现）
 
-如果后续需要研究内容因素 $A$、退化因素 $t$、$\operatorname{Cov}(A,t)$ 或输出方差交叉项，应先明确可观测的因素表示和配对数据构造，再单独设计实验。当前通道级 covariance loss 不应直接命名为 $\operatorname{Cov}(A,t)$ loss，也不应据此宣称完成了显式 disentanglement。
+如果后续需要研究内容因素 $A$、退化因素 $t$、$\operatorname{Cov}(A,t)$ 或输出方差交叉项，应先明确可观测的因素表示和配对数据构造，再单独设计实验。当前通道级 covariance loss 不应直接命名为 $\operatorname{Cov}(A,t)$ loss，也不应据此宣称已经获得完整的跨域不变性。
 
 当前实现只优化：
 
@@ -434,7 +434,7 @@ $$
 \qquad i\neq j.
 $$
 
-是否存在因素层面的解耦，以及它是否影响输出方差，需要后续机理分析验证，不纳入本阶段训练目标。
+是否形成可迁移的域不变表征，以及它是否影响输出方差，需要后续机理分析验证，不纳入本阶段的单一结论。
 
 ## 14. 实验矩阵
 

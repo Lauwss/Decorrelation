@@ -270,7 +270,7 @@ $\Delta_l(c)<0$ 表示 VCReg 在该条件和层上对退化更稳定，但只有
 
 ### 12.2 不能支持的结论
 
-在没有额外实验前，不得从本报告推出：已完成 content/degradation disentanglement；已证明 VCReg 对真实物理深度变化具有不变性；已证明模型能泛化到雨、模糊或其他退化；已证明 cosine distance 下降不是 feature collapse；已证明 Expander 空间变化等同于 raw Encoder 空间变化。
+在没有额外实验前，不得从本报告推出：已完成完整的跨域不变表征学习；已证明 VCReg 对真实物理深度变化具有不变性；已证明模型能泛化到雨、模糊或其他退化；已证明 cosine distance 下降不是 feature collapse；已证明 Expander 空间变化等同于 raw Encoder 空间变化。
 
 ### 12.3 后续实验建议
 
